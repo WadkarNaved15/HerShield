@@ -8,20 +8,36 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const Twilio = require('twilio');
 const {parsePhoneNumberFromString} = require('libphonenumber-js');
+const http = require("http");
+const { Server } = require("socket.io");
+const { processAudio, stopRecognitionStream } = require("./Functions/FeelingUnsafe");
+
+
+
 const LocationRouter = require('./routes/Location');
 const AchievementsRouter = require('./routes/Achievements');
 const SosRouter = require('./routes/Sos')
 const UsersRouter = require('./routes/users');
 const FeelingUnsafeRouter = require('./routes/FeelingUnsafe');
-const checkInJob = require('./cronJobs/checkInJob');
 const {sendOtp} = require('./utils/Twilio');
 const path = require('path');
-
+const { initializeCheckIns } = require('./Functions/FeelingUnsafe');
+initializeCheckIns();
 
 require('dotenv').config(); // To load environment variables from a .env file
 
 const app = express();
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: { origin: "*" },
+  transports: ["websocket", "polling"], // Ensures WebSocket works
+});
+
 const PORT = process.env.PORT || 3000;
+
+
+
 
 // Middleware
 app.use(express.json());
@@ -50,16 +66,27 @@ mongoose.connect(process.env.MONGO_URI,{
   .then(() => console.log('MongoDB connected successfully'))
   .catch((err) => console.error('MongoDB connection error:', err));
 
-const ngrokUrl= process.env.NGROK_URL;
-const twilioNumber = process.env.TWILIO_PHONE_NUMBER;
-const accountSid = process.env.TWILIO_ACCOUNT_SID;
-const authToken = process.env.TWILIO_AUTH_TOKEN;
-const client = Twilio(accountSid, authToken);
 
+  io.on("connection", (socket) => {
+    console.log("🟢 New WebSocket client connected");
+  
+    socket.on("audio_data", (data) => {
+      processAudio(socket, data);
+    });
+  
+    socket.on("disconnect", () => {
+      console.log("🔴 Client disconnected");
+      stopRecognitionStream();
+    });
+  });
+  
+
+const ngrokUrl= process.env.NGROK_URL;
 const otpStore = new Map();
 
 
-checkInJob.start();
+
+
 
 // Generate a 6-digit OTP
 const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString();
@@ -440,6 +467,6 @@ app.post('/login', async (req, res) => {
 
 
 // Start the server
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });

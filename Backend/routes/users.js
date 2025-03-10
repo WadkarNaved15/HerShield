@@ -5,14 +5,11 @@ const {verifyAccessToken} = require("../utils/jwt")
 const {getUser} = require("../utils/users");
 const User = require("../model/Users");
 const Achievements = require("../model/Achievements");
+const {getUserFromToken} = require("../Functions/userToken");
 
 router.put("/fcm-token", async (req, res) => {
     const { fcm_token } = req.body;
-    const token = req.headers.authorization;
-    if(!token) return res.status(401).json({ error: "Unauthorized" });
-    if (token && token.startsWith('Bearer')) {
-        const extractedToken = token.split(' ')[1]; 
-        const decoded = verifyAccessToken(extractedToken);
+        const decoded = getUserFromToken(req);
         const userId = decoded._id;
     if (!userId || !fcm_token) return res.status(400).json({ error: "Invalid data" });
     try {
@@ -22,10 +19,7 @@ router.put("/fcm-token", async (req, res) => {
         console.error("Error saving FCM token:", error);
         res.status(500).json({ error: "Error saving FCM token" });
     }}
-    else{
-        return res.status(401).json({ error: "Unauthorized" });
-    }
-});
+);
 
 router.get("/fcm-token", async (req, res) => {
     const userId = req.query.userId;

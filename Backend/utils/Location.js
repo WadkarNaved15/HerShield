@@ -22,6 +22,7 @@ async function getNearestUsers(lat, long, radius = 100, unit = "km", count = 100
 }
 
 async function getUserLocation(userId) {
+  console.log(userId);
   const location = await client.geopos("users_location", userId);
   return location ? { longitude: location[0][0], latitude: location[0][1] } : null;
 }
